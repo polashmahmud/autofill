@@ -2,6 +2,7 @@
 
 let currentTabId = null;
 let currentUrlObj = null;
+let currentView = "page"; // "page" | "all"
 
 function pageKey(exact) {
   // storage key for this page: hostname+pathname (default) or full href (exact)
@@ -25,6 +26,18 @@ async function getAllRelevantProfiles() {
   return merged;
 }
 
+async function getAllProfilesEverywhere() {
+  const all = await chrome.storage.local.get(null);
+  const merged = [];
+  Object.entries(all).forEach(([key, arr]) => {
+    if (!key.startsWith("profiles::") || !Array.isArray(arr)) return;
+    const site = key.slice("profiles::".length);
+    arr.forEach((p) => merged.push({ ...p, storageKey: key, site }));
+  });
+  merged.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+  return merged;
+}
+
 function setStatus(msg) {
   document.getElementById("status").textContent = msg;
   setTimeout(() => {
@@ -34,9 +47,13 @@ function setStatus(msg) {
 
 async function renderProfiles() {
   const list = document.getElementById("profileList");
-  const profiles = await getAllRelevantProfiles();
+  const label = document.getElementById("listLabel");
+  const isAll = currentView === "all";
+  label.textContent = isAll ? "All saved profiles" : "Saved profiles for this page";
+
+  const profiles = isAll ? await getAllProfilesEverywhere() : await getAllRelevantProfiles();
   if (profiles.length === 0) {
-    list.innerHTML = '<div class="empty">No saved profiles for this page yet.</div>';
+    list.innerHTML = `<div class="empty">${isAll ? "No saved profiles yet." : "No saved profiles for this page yet."}</div>`;
     return;
   }
   list.innerHTML = "";
@@ -45,16 +62,24 @@ async function renderProfiles() {
     div.className = "profile-item";
     const initial = escapeHtml(p.name.trim().charAt(0).toUpperCase() || "?");
     const savedAt = p.savedAt ? new Date(p.savedAt).toLocaleDateString() : "";
+    const siteLine = isAll ? `<div class="profile-site">${escapeHtml(p.site)}</div>` : "";
     div.innerHTML = `
       <div class="avatar">${initial}</div>
       <div class="profile-info">
         <div class="profile-name">${escapeHtml(p.name)}</div>
+        ${siteLine}
         <div class="profile-meta">${savedAt}</div>
       </div>
       <span class="profile-actions">
-        <button class="icon-btn apply-btn" title="Fill" data-key="${p.storageKey}" data-name="${escapeHtml(p.name)}">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg>
-        </button>
+        ${
+          isAll
+            ? `<button class="icon-btn open-fill-btn" title="Open page & fill" data-key="${p.storageKey}" data-name="${escapeHtml(p.name)}">
+                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>
+               </button>`
+            : `<button class="icon-btn apply-btn" title="Fill" data-key="${p.storageKey}" data-name="${escapeHtml(p.name)}">
+                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg>
+               </button>`
+        }
         <button class="icon-btn del-btn" title="Delete" data-key="${p.storageKey}" data-name="${escapeHtml(p.name)}">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2m-1 0v14a1 1 0 01-1 1H9a1 1 0 01-1-1V6"/></svg>
         </button>
@@ -65,6 +90,9 @@ async function renderProfiles() {
 
   list.querySelectorAll(".apply-btn").forEach((btn) => {
     btn.addEventListener("click", () => applyProfile(btn.dataset.key, btn.dataset.name));
+  });
+  list.querySelectorAll(".open-fill-btn").forEach((btn) => {
+    btn.addEventListener("click", () => openAndFillProfile(btn.dataset.key, btn.dataset.name));
   });
   list.querySelectorAll(".del-btn").forEach((btn) => {
     btn.addEventListener("click", () => deleteProfile(btn.dataset.key, btn.dataset.name));
@@ -145,18 +173,63 @@ async function applyProfile(storageKey, name) {
   setStatus(`Filled ${filledCount} field(s) from "${name}".`);
 }
 
-async function deleteProfile(storageKey, name) {
-  const exactKey = storageKeyForPage(true);
-  const pathKey = storageKeyForPage(false);
-  const keys = [exactKey, pathKey];
-  const result = await chrome.storage.local.get(keys);
-  const updates = {};
-  keys.forEach((k) => {
-    const arr = result[k] || [];
-    const filtered = arr.filter((p) => p.name !== name);
-    if (filtered.length !== arr.length) updates[k] = filtered;
+function waitForTabLoad(tabId) {
+  return new Promise((resolve) => {
+    function listener(updatedTabId, changeInfo) {
+      if (updatedTabId === tabId && changeInfo.status === "complete") {
+        chrome.tabs.onUpdated.removeListener(listener);
+        resolve();
+      }
+    }
+    chrome.tabs.onUpdated.addListener(listener);
   });
-  await chrome.storage.local.set(updates);
+}
+
+async function openAndFillProfile(storageKey, name) {
+  const arr = (await chrome.storage.local.get(storageKey))[storageKey] || [];
+  const profile = arr.find((p) => p.name === name);
+  if (!profile) return;
+
+  const site = storageKey.slice("profiles::".length);
+  setStatus(`Opening ${site}...`);
+
+  const tab = await chrome.tabs.create({ url: site });
+  await waitForTabLoad(tab.id);
+  // Give SPA/dynamic pages a moment to render form fields after "complete".
+  await new Promise((r) => setTimeout(r, 600));
+
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ["content.js"],
+    });
+
+    let filledCount = 0;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const [{ result }] = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: (data) => window.__formAutoFillApply(data),
+        args: [profile.data],
+      });
+      filledCount = result;
+      if (filledCount > 0) break;
+      await new Promise((r) => setTimeout(r, 700));
+    }
+    setStatus(`Filled ${filledCount} field(s) from "${name}".`);
+  } catch (err) {
+    setStatus(`Error: ${err.message}`);
+  }
+}
+
+async function deleteProfile(storageKey, name) {
+  const result = await chrome.storage.local.get(storageKey);
+  const arr = result[storageKey] || [];
+  const filtered = arr.filter((p) => p.name !== name);
+  if (filtered.length === 0) {
+    await chrome.storage.local.remove(storageKey);
+  } else {
+    await chrome.storage.local.set({ [storageKey]: filtered });
+  }
   setStatus(`Deleted "${name}".`);
   renderProfiles();
 }
@@ -187,6 +260,21 @@ async function init() {
 
   document.getElementById("saveBtn").addEventListener("click", saveCurrentForm);
   document.getElementById("scopeExact").addEventListener("change", renderProfiles);
+
+  const tabThisPage = document.getElementById("tabThisPage");
+  const tabAllProfiles = document.getElementById("tabAllProfiles");
+  tabThisPage.addEventListener("click", () => {
+    currentView = "page";
+    tabThisPage.classList.add("active");
+    tabAllProfiles.classList.remove("active");
+    renderProfiles();
+  });
+  tabAllProfiles.addEventListener("click", () => {
+    currentView = "all";
+    tabAllProfiles.classList.add("active");
+    tabThisPage.classList.remove("active");
+    renderProfiles();
+  });
 
   await cleanupDuplicates();
   renderProfiles();

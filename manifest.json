@@ -3,7 +3,8 @@
   "name": "Form AutoFill Saver",
   "version": "1.0",
   "description": "Save and auto-fill form data per URL/page. Useful for testing forms repeatedly.",
-  "permissions": ["storage", "activeTab", "scripting"],
+  "permissions": ["storage", "activeTab", "scripting", "tabs"],
+  "host_permissions": ["<all_urls>"],
   "action": {
     "default_popup": "popup.html",
     "default_title": "Form AutoFill Saver"
