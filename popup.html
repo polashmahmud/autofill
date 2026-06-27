@@ -2,113 +2,264 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Form AutoFill Saver</title>
+  <title>AutoFill Vault</title>
   <style>
+    :root {
+      --primary: #4f46e5;
+      --primary-dark: #4338ca;
+      --bg: #f6f7fb;
+      --surface: #ffffff;
+      --border: #e7e8ef;
+      --text: #1f2230;
+      --text-muted: #6b7280;
+      --danger: #ef4444;
+      --danger-bg: #fef2f2;
+      --success: #16a34a;
+      --radius: 10px;
+    }
+    * { box-sizing: border-box; }
     body {
-      width: 320px;
-      font-family: -apple-system, Segoe UI, Roboto, sans-serif;
-      padding: 12px;
-      color: #1f2937;
+      width: 340px;
+      margin: 0;
+      font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px 10px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .brand-icon {
+      width: 26px;
+      height: 26px;
+      border-radius: 7px;
+      background: linear-gradient(135deg, var(--primary), #7c3aed);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 14px;
     }
     h1 {
-      font-size: 14px;
-      margin: 0 0 8px;
+      font-size: 15px;
+      font-weight: 700;
+      margin: 0;
+      letter-spacing: -0.2px;
     }
-    .url {
-      font-size: 11px;
-      color: #6b7280;
-      word-break: break-all;
-      margin-bottom: 10px;
-      background: #f3f4f6;
-      padding: 6px;
-      border-radius: 6px;
+    main {
+      padding: 14px 16px 16px;
     }
-    .row {
+    .url-card {
       display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11.5px;
+      color: var(--text-muted);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      border-radius: var(--radius);
+      margin-bottom: 12px;
+      word-break: break-all;
+    }
+    .url-card svg { flex-shrink: 0; color: #9ca3af; }
+
+    .scope-toggle {
+      display: flex;
+      align-items: center;
       gap: 6px;
-      margin-bottom: 8px;
+      font-size: 11.5px;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .scope-toggle input { accent-color: var(--primary); width: 13px; height: 13px; }
+
+    .save-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px;
+      margin-bottom: 14px;
+      display: flex;
+      gap: 8px;
     }
     input[type="text"] {
       flex: 1;
-      padding: 6px 8px;
-      border: 1px solid #d1d5db;
-      border-radius: 6px;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
       font-size: 13px;
+      background: #fafafe;
+      color: var(--text);
+      outline: none;
+      transition: border-color .15s;
+    }
+    input[type="text"]:focus {
+      border-color: var(--primary);
+      background: #fff;
     }
     button {
       cursor: pointer;
       border: none;
-      border-radius: 6px;
-      padding: 6px 10px;
+      border-radius: 8px;
+      padding: 8px 14px;
       font-size: 13px;
       font-weight: 600;
+      transition: background .15s, opacity .15s;
     }
+    button:disabled { opacity: .6; cursor: default; }
     .btn-primary {
-      background: #1e3a5f;
-      color: white;
+      background: var(--primary);
+      color: #fff;
     }
-    .btn-secondary {
-      background: #e5e7eb;
-      color: #111827;
+    .btn-primary:hover:not(:disabled) { background: var(--primary-dark); }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: var(--text-muted);
+      margin: 0 0 8px 2px;
     }
+
     .profile-list {
-      margin-top: 10px;
-      max-height: 220px;
+      max-height: 260px;
       overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
     .profile-item {
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      padding: 6px 8px;
-      border: 1px solid #e5e7eb;
-      border-radius: 6px;
-      margin-bottom: 6px;
+      gap: 10px;
+      padding: 9px 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      transition: box-shadow .15s, border-color .15s;
+    }
+    .profile-item:hover {
+      border-color: #d4d6e8;
+      box-shadow: 0 2px 8px rgba(79, 70, 229, .08);
+    }
+    .avatar {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #818cf8, #6366f1);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       font-size: 13px;
+      font-weight: 700;
+      flex-shrink: 0;
     }
-    .profile-actions button {
-      padding: 4px 8px;
-      font-size: 12px;
-      margin-left: 4px;
+    .profile-info {
+      flex: 1;
+      min-width: 0;
     }
+    .profile-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .profile-meta {
+      font-size: 10.5px;
+      color: var(--text-muted);
+    }
+    .profile-actions {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    .icon-btn {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      padding: 0;
+    }
+    .icon-btn:hover { background: #eef0fb; color: var(--primary); }
+    .icon-btn.del-btn:hover { background: var(--danger-bg); color: var(--danger); }
+
     .empty {
       font-size: 12px;
-      color: #9ca3af;
+      color: var(--text-muted);
       text-align: center;
-      padding: 10px 0;
+      padding: 22px 10px;
+      background: var(--surface);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
     }
+
     .status {
       font-size: 12px;
-      color: #16a34a;
-      min-height: 14px;
-      margin-top: 6px;
-    }
-    .scope-toggle {
-      font-size: 11px;
-      color: #6b7280;
-      margin-bottom: 6px;
+      color: var(--success);
+      min-height: 16px;
+      margin-top: 10px;
+      text-align: center;
+      font-weight: 600;
     }
   </style>
 </head>
 <body>
-  <h1>Form AutoFill Saver</h1>
-  <div class="url" id="currentUrl">loading...</div>
+  <header>
+    <div class="brand">
+      <div class="brand-icon">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2L4 5v6c0 5 3.5 8.5 8 11 4.5-2.5 8-6 8-11V5l-8-3z"/>
+        </svg>
+      </div>
+      <h1>AutoFill Vault</h1>
+    </div>
+  </header>
 
-  <label class="scope-toggle">
-    <input type="checkbox" id="scopeExact" />
-    Match exact URL (otherwise matches by full path, ignoring query string)
-  </label>
+  <main>
+    <div class="url-card">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20 15 15 0 010-20"/>
+      </svg>
+      <span id="currentUrl">loading...</span>
+    </div>
 
-  <div class="row">
-    <input type="text" id="profileName" placeholder="Profile name (e.g. Test User 1)" />
-    <button class="btn-primary" id="saveBtn">Save</button>
-  </div>
+    <label class="scope-toggle">
+      <input type="checkbox" id="scopeExact" />
+      Match exact URL (otherwise matches by path only)
+    </label>
 
-  <div class="profile-list" id="profileList">
-    <div class="empty">No saved profiles for this page yet.</div>
-  </div>
+    <div class="save-card">
+      <input type="text" id="profileName" placeholder="Profile name (e.g. Test User 1)" />
+      <button class="btn-primary" id="saveBtn">Save</button>
+    </div>
 
-  <div class="status" id="status"></div>
+    <div class="section-label">Saved profiles for this page</div>
+    <div class="profile-list" id="profileList">
+      <div class="empty">No saved profiles for this page yet.</div>
+    </div>
+
+    <div class="status" id="status"></div>
+  </main>
 
   <script src="popup.js"></script>
 </body>

@@ -43,11 +43,21 @@ async function renderProfiles() {
   profiles.forEach((p, i) => {
     const div = document.createElement("div");
     div.className = "profile-item";
+    const initial = escapeHtml(p.name.trim().charAt(0).toUpperCase() || "?");
+    const savedAt = p.savedAt ? new Date(p.savedAt).toLocaleDateString() : "";
     div.innerHTML = `
-      <span>${escapeHtml(p.name)}</span>
+      <div class="avatar">${initial}</div>
+      <div class="profile-info">
+        <div class="profile-name">${escapeHtml(p.name)}</div>
+        <div class="profile-meta">${savedAt}</div>
+      </div>
       <span class="profile-actions">
-        <button class="btn-primary apply-btn" data-key="${p.storageKey}" data-name="${escapeHtml(p.name)}">Fill</button>
-        <button class="btn-secondary del-btn" data-key="${p.storageKey}" data-name="${escapeHtml(p.name)}">Del</button>
+        <button class="icon-btn apply-btn" title="Fill" data-key="${p.storageKey}" data-name="${escapeHtml(p.name)}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg>
+        </button>
+        <button class="icon-btn del-btn" title="Delete" data-key="${p.storageKey}" data-name="${escapeHtml(p.name)}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2m-1 0v14a1 1 0 01-1 1H9a1 1 0 01-1-1V6"/></svg>
+        </button>
       </span>
     `;
     list.appendChild(div);
