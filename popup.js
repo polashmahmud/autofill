@@ -80,6 +80,9 @@ async function renderProfiles() {
                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg>
                </button>`
         }
+        <button class="icon-btn edit-btn" title="Edit" data-key="${p.storageKey}" data-name="${escapeHtml(p.name)}">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+        </button>
         <button class="icon-btn del-btn" title="Delete" data-key="${p.storageKey}" data-name="${escapeHtml(p.name)}">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2m-1 0v14a1 1 0 01-1 1H9a1 1 0 01-1-1V6"/></svg>
         </button>
@@ -97,6 +100,122 @@ async function renderProfiles() {
   list.querySelectorAll(".del-btn").forEach((btn) => {
     btn.addEventListener("click", () => deleteProfile(btn.dataset.key, btn.dataset.name));
   });
+  list.querySelectorAll(".edit-btn").forEach((btn) => {
+    btn.addEventListener("click", () => openEditModal(btn.dataset.key, btn.dataset.name));
+  });
+}
+
+let editingKey = null;
+let editingOldName = null;
+
+function fieldLabel(key) {
+  // "id:username" -> "username (id)" / "idx:INPUT:3" -> "INPUT #3 (no id/name)"
+  const [kind, ...rest] = key.split(":");
+  if (kind === "idx") {
+    const [tag, idx] = rest;
+    return `${tag} #${idx} (no id/name)`;
+  }
+  return `${rest.join(":")} (${kind})`;
+}
+
+async function openEditModal(storageKey, name) {
+  const arr = (await chrome.storage.local.get(storageKey))[storageKey] || [];
+  const profile = arr.find((p) => p.name === name);
+  if (!profile) return;
+
+  editingKey = storageKey;
+  editingOldName = name;
+
+  document.getElementById("editProfileName").value = profile.name;
+
+  const container = document.getElementById("editFieldsContainer");
+  container.innerHTML = "";
+  Object.entries(profile.data).forEach(([fieldKey, info]) => {
+    const row = document.createElement("div");
+    row.className = "field-row";
+    row.dataset.fieldKey = fieldKey;
+    row.dataset.fieldType = info.type;
+
+    if (info.type === "checkbox" || info.type === "radio") {
+      row.innerHTML = `
+        <label class="checkbox-row">
+          <input type="checkbox" ${info.value ? "checked" : ""} />
+          ${escapeHtml(fieldLabel(fieldKey))}
+        </label>
+      `;
+    } else if (info.isPassword) {
+      row.innerHTML = `
+        <label>${escapeHtml(fieldLabel(fieldKey))} (password)</label>
+        <div class="password-row">
+          <input type="password" value="${escapeHtml(String(info.value ?? ""))}" />
+          <button type="button" class="icon-btn toggle-pw-btn" title="Show/hide">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+      `;
+    } else {
+      row.innerHTML = `
+        <label>${escapeHtml(fieldLabel(fieldKey))}</label>
+        <input type="text" value="${escapeHtml(String(info.value ?? ""))}" />
+      `;
+    }
+    container.appendChild(row);
+  });
+
+  container.querySelectorAll(".toggle-pw-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const input = btn.previousElementSibling;
+      input.type = input.type === "password" ? "text" : "password";
+    });
+  });
+
+  document.getElementById("editOverlay").classList.remove("hidden");
+}
+
+function closeEditModal() {
+  document.getElementById("editOverlay").classList.add("hidden");
+  editingKey = null;
+  editingOldName = null;
+}
+
+async function saveEditModal() {
+  if (!editingKey || !editingOldName) return;
+
+  const newName = document.getElementById("editProfileName").value.trim();
+  if (!newName) {
+    setStatus("Profile name can't be empty.");
+    return;
+  }
+
+  const arr = (await chrome.storage.local.get(editingKey))[editingKey] || [];
+  if (newName !== editingOldName && arr.some((p) => p.name === newName)) {
+    setStatus(`A profile named "${newName}" already exists.`);
+    return;
+  }
+  const profile = arr.find((p) => p.name === editingOldName);
+  if (!profile) {
+    closeEditModal();
+    renderProfiles();
+    return;
+  }
+
+  document.querySelectorAll("#editFieldsContainer .field-row").forEach((row) => {
+    const fieldKey = row.dataset.fieldKey;
+    const fieldType = row.dataset.fieldType;
+    const info = profile.data[fieldKey];
+    if (!info) return;
+    if (fieldType === "checkbox" || fieldType === "radio") {
+      info.value = row.querySelector("input").checked;
+    } else {
+      info.value = row.querySelector("input").value;
+    }
+  });
+
+  profile.name = newName;
+  await chrome.storage.local.set({ [editingKey]: arr });
+  setStatus(`Saved changes to "${newName}".`);
+  closeEditModal();
+  renderProfiles();
 }
 
 function escapeHtml(str) {
@@ -260,6 +379,13 @@ async function init() {
 
   document.getElementById("saveBtn").addEventListener("click", saveCurrentForm);
   document.getElementById("scopeExact").addEventListener("change", renderProfiles);
+
+  document.getElementById("editCloseBtn").addEventListener("click", closeEditModal);
+  document.getElementById("editCancelBtn").addEventListener("click", closeEditModal);
+  document.getElementById("editSaveBtn").addEventListener("click", saveEditModal);
+  document.getElementById("editOverlay").addEventListener("click", (e) => {
+    if (e.target.id === "editOverlay") closeEditModal();
+  });
 
   const tabThisPage = document.getElementById("tabThisPage");
   const tabAllProfiles = document.getElementById("tabAllProfiles");

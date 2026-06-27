@@ -244,6 +244,17 @@
       background: var(--primary);
       color: #fff;
     }
+    .rename-input {
+      width: 100%;
+      padding: 2px 4px;
+      font-size: 13px;
+      font-weight: 600;
+      border: 1px solid var(--primary);
+      border-radius: 4px;
+      background: #fff;
+      color: var(--text);
+      outline: none;
+    }
     .profile-site {
       font-size: 10.5px;
       color: var(--primary);
@@ -251,6 +262,93 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 17, 30, .45);
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 16px 0;
+      z-index: 10;
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal {
+      background: var(--surface);
+      border-radius: var(--radius);
+      width: 308px;
+      max-height: 92vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-header h2 {
+      font-size: 14px;
+      margin: 0;
+    }
+    .modal-close {
+      background: transparent;
+      color: var(--text-muted);
+      padding: 4px;
+      border-radius: 6px;
+    }
+    .modal-close:hover { background: #eef0fb; color: var(--primary); }
+    .modal-body {
+      padding: 12px 14px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .field-row {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .field-row label {
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+      word-break: break-all;
+    }
+    .field-row .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12.5px;
+    }
+    .field-row input[type="checkbox"] { accent-color: var(--primary); width: 14px; height: 14px; }
+    .password-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .password-row input { flex: 1; }
+    .password-row .icon-btn {
+      width: 30px;
+      height: 30px;
+      flex-shrink: 0;
+    }
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      padding: 12px 14px;
+      border-top: 1px solid var(--border);
+    }
+    .btn-secondary {
+      background: #eef0fb;
+      color: var(--text);
+    }
+    .btn-secondary:hover { background: #e2e4f5; }
   </style>
 </head>
 <body>
@@ -295,6 +393,28 @@
 
     <div class="status" id="status"></div>
   </main>
+
+  <div class="modal-overlay hidden" id="editOverlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Edit profile</h2>
+        <button class="modal-close" id="editCloseBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="field-row">
+          <label>Profile name</label>
+          <input type="text" id="editProfileName" />
+        </div>
+        <div id="editFieldsContainer"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="editCancelBtn">Cancel</button>
+        <button class="btn-primary" id="editSaveBtn">Save changes</button>
+      </div>
+    </div>
+  </div>
 
   <script src="popup.js"></script>
 </body>
