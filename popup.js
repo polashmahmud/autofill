@@ -15,7 +15,7 @@ function storageKeyForPage(exact) {
 
 async function getAllRelevantProfiles() {
   // gather profiles saved under both exact and path-based keys for this page
-  const keys = [storageKeyForPage(true), storageKeyForPage(false)];
+  const keys = [...new Set([storageKeyForPage(true), storageKeyForPage(false)])];
   const result = await chrome.storage.local.get(keys);
   const merged = [];
   keys.forEach((k) => {
@@ -96,11 +96,18 @@ async function saveCurrentForm() {
 
     // Re-read fresh right before writing, and de-duplicate by name using a Map
     // so even if two saves overlap, the final array never has repeated names.
+    const otherKey = storageKeyForPage(!exact);
     const existing = (await chrome.storage.local.get(key))[key] || [];
     const byName = new Map(existing.map((p) => [p.name, p]));
     byName.set(name, { name, data, savedAt: Date.now() });
     const deduped = Array.from(byName.values());
-    await chrome.storage.local.set({ [key]: deduped });
+
+    const updates = { [key]: deduped };
+    if (otherKey !== key) {
+      const otherExisting = (await chrome.storage.local.get(otherKey))[otherKey] || [];
+      updates[otherKey] = otherExisting.filter((p) => p.name !== name);
+    }
+    await chrome.storage.local.set(updates);
 
     document.getElementById("profileName").value = "";
     setStatus(`Saved "${name}".`);
@@ -129,15 +136,23 @@ async function applyProfile(storageKey, name) {
 }
 
 async function deleteProfile(storageKey, name) {
-  const arr = (await chrome.storage.local.get(storageKey))[storageKey] || [];
-  const filtered = arr.filter((p) => p.name !== name);
-  await chrome.storage.local.set({ [storageKey]: filtered });
+  const exactKey = storageKeyForPage(true);
+  const pathKey = storageKeyForPage(false);
+  const keys = [exactKey, pathKey];
+  const result = await chrome.storage.local.get(keys);
+  const updates = {};
+  keys.forEach((k) => {
+    const arr = result[k] || [];
+    const filtered = arr.filter((p) => p.name !== name);
+    if (filtered.length !== arr.length) updates[k] = filtered;
+  });
+  await chrome.storage.local.set(updates);
   setStatus(`Deleted "${name}".`);
   renderProfiles();
 }
 
 async function cleanupDuplicates() {
-  const keys = [storageKeyForPage(true), storageKeyForPage(false)];
+  const keys = [...new Set([storageKeyForPage(true), storageKeyForPage(false)])];
   const result = await chrome.storage.local.get(keys);
   const updates = {};
   keys.forEach((k) => {
